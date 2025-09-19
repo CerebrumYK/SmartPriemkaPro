@@ -27,6 +27,15 @@ jobs:
         with:
           node-version: 20
 
+      - name: Ensure required directories
+        run: |
+          mkdir -p .next
+          mkdir -p node_modules
+          mkdir -p dist
+          mkdir -p out
+          mkdir -p public
+          mkdir -p src
+
       - name: Install dependencies
         run: npm install
 

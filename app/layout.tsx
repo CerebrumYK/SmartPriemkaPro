@@ -1,11 +1,11 @@
 import React from 'react';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { Sidebar } from '@/components/ui/sidebar';
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration';
 
-const inter = Inter({ subsets: ['latin'] });
+// Use system fonts when Google Fonts is not available
+const fontClassName = 'font-sans';
 
 export const metadata = {
   title: 'SmartPriemkaPro',
@@ -18,7 +18,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={fontClassName}>
         <ServiceWorkerRegistration />
         <div className="min-h-screen bg-background">
           <Sidebar />
