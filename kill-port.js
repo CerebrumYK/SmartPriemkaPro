@@ -10,6 +10,6 @@ try {
   } else {
     console.log('✅ Порт 3000 свободен');
   }
-} catch (err) {
+} catch (_err) {
   console.log('ℹ️ Не удалось проверить порт 3000, возможно lsof отсутствует');
 }
