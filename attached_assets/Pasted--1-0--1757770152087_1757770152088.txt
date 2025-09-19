@@ -1,0 +1,588 @@
+Техническое задание
+на разработку веб‑приложения
+«Приёмка объектов недвижимости»
+Версия: 1.0
+Язык интерфейса: RU (на первом этапе)
+Модель развёртывания: локальный сервер/ВМ (с перспективой Azure)
+Целевая платформа клиента: десктоп/планшет (в т.ч. iPad), мобильные браузеры
+Пользователи на первом этапе: 1 специалист (без мульти-тенантности)
+________________________________________
+1) Цель и ключевая ценность
+Собрать единое веб-приложение, которое позволяет:
+•	быстро находить и отбирать дефекты строительства/ремонта по фильтрам (страна → блок → тип, локация, критичность, текстовый поиск);
+•	отмечать нужные позиции чекбоксами, дополнять их измерениями, привязками к локациям и нормативам;
+•	формировать отчёты с обязательными нормативными ссылками/выдержками и фото, экспортировать в PDF/DOCX/XLSX;
+•	хранить и обрабатывать медиафайлы (галерея: теги, подписи, сортировка, пакетное удаление) через Supabase Storage c Signed URLs.
+Отдельные требования, подтверждённые пользователем:
+•	Все нормы (РК/РФ и др.) — в одной базе, в отчёте обязательны ссылки/цитаты.
+•	DOCX-экспорт: для каждого дефекта вставлять 2–3 фото, если доступны.
+•	Галерея: теги и поиск по тегам («трещина», «окно», «радиатор» и т.п.).
+•	PWA/офлайн + Background Sync для POST-операций с визуальными статусами.
+________________________________________
+2) Роли и доступ
+•	Гость (anon): только чтение (через RLS).
+•	Авторизованный (authenticated): чтение + добавление измерений, изменение атрибутов дефекта (критичность, локация), добавление новых локаций, динамическое пополнение справочников блоков/типов.
+•	Админ: техподдержка/миграции (вне UI).
+•	На первом этапе: один пользователь, без менеджеров/ревьюеров и без «владельца записи».
+________________________________________
+3) Технологический стек
+•	Frontend/Backend: Next.js 15 (App Router), TypeScript, Tailwind CSS.
+•	БД/аутентификация: Supabase (Postgres + Auth + RLS).
+•	Экспорт:
+o	PDF: серверный рендер через Playwright/Puppeteer (для больших выборок).
+o	DOCX: пакет docx (серверный); встраивание 2–3 фото на дефект.
+o	XLSX: пакет xlsx (сервер).
+•	Состояние выбора: localStorage.
+•	PWA: манифест + сервис-воркер + IndexedDB для справочников и кэша GET.
+•	Фулл-текст поиск: PostgreSQL pg_trgm (+ ранжирование).
+________________________________________
+4) Переменные окружения (.env.local)
+NEXT_PUBLIC_SUPABASE_URL=…              # Публичный URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=…         # Только anon key для браузера
+# ВАЖНО: service_role ключ хранить ТОЛЬКО на сервере для миграций/сидов.
+Примечание: пользователь предоставил доступы отдельно; использовать service_role исключительно для серверных миграций/импорта, затем ключ ротировать.
+________________________________________
+5) Модель данных (Supabase / Postgres)
+5.1 Таблицы (основные)
+•	countries(id uuid PK, name text unique, is_enabled bool)
+•	blocks(id uuid PK, name text unique)
+•	defect_types(id uuid PK, block_id → blocks.id, name text, unique(block_id,name))
+•	norms(id uuid PK, country_id → countries.id, code text, point text, source_url text, full_text text, unique(country_id,code,point))
+•	severity_levels(id bigserial PK, name text unique, sort_order int) — 4 уровня (Критично/Существенно/Незначительно/Информативно)
+•	location_categories(id uuid PK, name text unique) — «Квартира», «Частный дом/Коттедж», «Офис», …
+•	locations(id uuid PK, category_id → location_categories.id, name text, unique(category_id,name))
+•	defects(id uuid PK, country_id, block_id, type_id, problem text, description text, solution text, norm_id uuid, severity_id bigint, location_id uuid, created_at timestamptz default now())
+o	уникальный индекс (дедуп):
+(country_id, block_id, type_id, problem, coalesce(norm_id,'00000000-0000-0000-0000-000000000000'))
+•	defect_measurements(id bigserial PK, defect_id uuid → defects.id, name text, value text, unit text, created_at timestamptz default now(), created_by uuid)
+•	media_files(id uuid PK, project_id uuid, defect_id uuid?, location_id uuid?, path text, preview_path text?, exif jsonb?, tags text[], created_at timestamptz default now())
+•	import_logs(id bigserial PK, source text, rows int, started_at timestamptz, finished_at timestamptz, details jsonb)
+5.2 Представления (для UI)
+•	defects_full_v2 — развёрнутая запись дефекта: имена страны/блока/типа/локаций, норма (код/пункт/ссылка/выдержка), критичность (имя, порядок), удобный norm_display = code + point.
+•	defects_view_v2 — компактная выборка для списка/таблицы (с norm_display и severity_order).
+5.3 Политики RLS
+Включены на всех таблицах.
+•	SELECT: доступны anon и authenticated (read-only).
+•	INSERT/UPDATE/DELETE:
+o	defect_measurements — разрешить authenticated все операции;
+o	defects — UPDATE (критичность, локация, problem/description/solution);
+o	locations — INSERT (пользователь может добавлять свои локации);
+o	media_files — INSERT (добавление медиа/метаданных).
+5.4 Индексы и производительность
+•	Индексы на всех FK.
+•	defects_dedupe_idx (см. выше).
+•	Для фулл-текста: gin + pg_trgm на (problem, description, solution, norm_display).
+•	Бюджет ответа списка: ≤300–600 мс при pageSize=50 и типовых фильтрах.
+________________________________________
+6) UI/UX
+6.1 Главная «/»
+Фильтры (верхняя панель):
+•	Страна (из countries, is_enabled=true),
+•	Блок (из blocks),
+•	Тип (из defect_types, зависит от блока),
+•	Категория локации (из location_categories),
+•	Локация (из locations, зависит от категории),
+•	Критичность (из severity_levels),
+•	Поиск (фри-текст по problem/description/solution/norm_display; при включённом pg_trgm — ранжирование).
+Таблица дефектов (источник defects_view_v2):
+колонки: checkbox, ID, Страна, Блок, Тип, Проблема, Описание, Решение, Норма (display), Критичность, Категория локации, Локация.
+•	Сортировка по всем колонкам.
+•	Скрытие пустых/нерелевантных значений при активных фильтрах.
+•	Пагинация (серверная): 50/100/200, стрелки, «в начало/в конец», «go to page N».
+•	Чекбоксы выбора строк (сохранение в localStorage по id).
+•	Кнопки: «Выбрать страницу / Снять выбор», «Выбрать всё (по текущим фильтрам)».
+Панель действий:
+•	Экспорт выбранных: PDF/DOCX/XLSX (по ids из localStorage).
+•	Экспорт всех по фильтрам: PDF/DOCX/XLSX (сервер формирует по фильтрам, без ограничений страниц).
+•	«Сброс фильтров», «Очистить выбор».
+6.2 Детальная «/defect/[id]»
+•	Карточка (read-only для anon, editable для authenticated):
+страна (R/O), блок (R/O), тип (R/O), problem/description/solution (editable), критичность (select), категория/локация (select → зависимый).
+Норма — кликабельная (открывает source_url).
+Кнопка «Сохранить» (PATCH).
+•	Измерения: табличный список (name, value, unit, created_at) + форма добавления; правка/удаление (для автора/authenticated).
+•	Добавить локацию: поле + выбор категории → insert в locations, сразу появляется в select.
+6.3 Галерея медиа
+•	Источник: media_files.
+•	Фичи: теги (tags[]), подписи, сортировка по дате/имени, поиск по тегам/имени, мультивыбор и пакетное удаление.
+•	Превью (800 px) и EXIF (дата съемки, камера и др.) — см. §8.
+•	Привязки: project_id/location_id/defect_id (опционально).
+6.4 Авторизация
+•	Вход: Email magic-link/OTP. OAuth/SSO — не требуется на первом этапе.
+6.5 Доступность и адаптивность
+•	Адаптив: десктоп/планшет/мобайл.
+•	A11y: aria-label, фокус-стили, управление с клавиатуры.
+________________________________________
+7) Поведение фильтров и зависимостей
+•	Выбор блока ограничивает список типов.
+•	Выбор категории локации ограничивает локации.
+•	Выбор страны не ограничивает типы/локации, но фильтрует строки результатов.
+•	Повторяемость дефектов по помещениям — допустима; вывод строится по стране/блоку/типу с учётом выбранных локаций.
+________________________________________
+8) Экспорт отчётов
+8.1 Общие правила
+•	Серверные API-роуты Next.js формируют PDF/DOCX/XLSX.
+•	Сортировка экспорта: severity_order, country, block, type.
+•	Лимит защиты: максимум 10 000 строк за один экспорт; для больших наборов — ZIP-архив со связками (PDF + XLSX + ссылки на медиа).
+8.2 DOCX (обязательно с фото)
+•	Шаблон: логотип, титул, оглавление, колонтитулы, QR-подпись (хэш/ссылка на карточку отчёта), фирменные цвета.
+•	По каждой записи-дефекту:
+o	заголовок (локация → категория → блок/тип → проблема),
+o	таблица полей: описание, решение, критичность, норма (код/пункт/выдержка + source_url),
+o	встраивание 2–3 фото при наличии: "media/{project_id}/{location}/{defect_id}/photos/*", с подписями «Фото 1: …».
+•	Перенос больших таблиц по страницам, повтор шапок.
+8.3 PDF
+•	Генерация из HTML сервером (Playwright/Puppeteer) c предсказуемой версткой (нумерация, колонтитулы, оглавление).
+8.4 XLSX
+•	Лист data с колонками списка + отдельные листы по группировкам (опционально).
+________________________________________
+9) API (Next.js App Router, v1)
+Базовый префикс: /api/v1
+9.1 Дефекты/список
+GET /defects
+query:
+•	country, block, type, severity, locCat, loc, q,
+•	sort=col:asc|desc, page, pageSize (50/100/200)
+resp:
+{
+  "rows": [ /* из defects_view_v2 */ ],
+  "total": 1234,
+  "page": 1,
+  "pageSize": 50
+}
+9.2 Дефект/деталь
+GET /defects/{id} → из defects_full_v2.
+PATCH /defects/{id}
+body (partial):
+{
+  "problem": "...",
+  "description": "...",
+  "solution": "...",
+  "severity_id": 2,
+  "location_id": "uuid"
+}
+9.3 Измерения
+POST /defects/{id}/measurements
+{ "name": "Зазор", "value": "3", "unit": "мм" }
+PATCH /measurements/{id} / DELETE /measurements/{id}
+9.4 Локации
+POST /locations
+{ "category_name": "Квартира", "name": "Гардеробная" }
+9.5 Экспорт
+•	Выбранные: GET /export?format=(pdf|docx|xlsx)&ids=uuid,uuid,…
+•	По фильтрам: GET /export?format=…&all=true&country=…&block=…&…
+Поведение: сервер повторяет выборку как /defects, но без пагинации; рендерит файл; ответ application/octet-stream с Content-Disposition: attachment.
+9.6 Медиа/поиск
+GET /media/search
+query: q (имя), tag, date_from, date_to, project_id, defect_id, location_id.
+resp: массив объектов media_files + Signed URLs (через серверный прокси-роут).
+9.7 Вебхуки (опционально)
+•	POST /webhooks/report-ready — отчёт сформирован (внутреннее уведомление).
+•	POST /webhooks/new-measurement, …/new-location — события добавления.
+Ошибки API: JSON { "error": { "code": "…", "message": "…" } }, корректные HTTP-коды.
+________________________________________
+10) Медиа-хранилище (Supabase Storage)
+10.1 Бакет и структура
+•	Бакет: media
+•	Папки: media/{project_id}/{location}/{defect_id}/{photos|videos|docs}/filename.ext
+10.2 Signed URLs + прокси
+•	Доступ медиа — только по Signed URL (TTL настраиваемый), выдаёт серверный прокси; прямые пути не раскрываются.
+10.3 Превью/EXIF (пояснение)
+•	Превью — автоматическая генерация уменьшенных изображений (≈800 px по длинной стороне) для быстрой галереи; хранится путь preview_path.
+•	EXIF — извлечение метаданных (дата/время съемки, камера, гео при наличии) в поле exif (jsonb). Это не «обязаловка», но сильно ускоряет поиск/сортировку и повышает информативность фото-вставок в отчёт.
+•	Теги — tags[] (например: ["трещина","окно","радиатор"]), участвуют в поиске.
+•	Ограничения размеров: «жёсткого» максимума не требуется (по согласованию). Рекомендовано предупреждение при загрузке >25 МБ (UX).
+________________________________________
+11) PWA и офлайн-режим
+•	Манифест + сервис-воркер.
+•	Кэширование GET-запросов и справочников в IndexedDB (countries/blocks/types/norms/severity/locations).
+•	Background Sync: очередь POST-операций (измерения, новые локации, медиа-метаданные).
+•	Статусы на клиенте: «в очереди» → «отправлено»; повторные попытки при восстановлении сети.
+•	Обработка конфликтов: при неуспехе PATCH — явно показать тост «Не удалось сохранить, попробуйте снова/перезагрузите страницу».
+________________________________________
+12) Нефункциональные требования
+•	Производительность: ответ списка ≤300–600 мс на 50 строк при типовых фильтрах; серверный экспорт больших наборов.
+•	Надёжность: централизованный обработчик ошибок API; ретраи в экспорте; внутренние уведомления о готовности отчёта.
+•	Логи/мониторинг: Sentry (frontend/backend), Logflare/pg_audit; трассировки длительных запросов.
+•	Бэкапы: собственные snapshots БД после каждого подтверждённого проекта (+ возможность «ручного» snapshot).
+•	Безопасность:
+o	только публичные ключи в браузере;
+o	вся запись — только для authenticated через RLS;
+o	ограничение экспорта для анонима (без «выбрать всё»);
+o	rate-limit в API можно опустить на первом этапе (1 пользователь), но оставить готовность включить.
+________________________________________
+13) Импорт/сидирование данных
+•	Исходные мастер-файлы: CSV/Excel (страны, блоки/типы, локации, нормы, дефекты).
+•	Порядок импорта:
+1.	countries, blocks, severity_levels, location_categories
+2.	defect_types (map: block_name → blocks.name)
+3.	locations (map: category_name → location_categories.name)
+4.	norms (map: country_name)
+5.	defects (map по именам и norm code+point, дедуп по индексу)
+6.	defect_measurements (по defect_id после вставки дефектов)
+•	Объём на запуск: ≈500 дефектов/страна, возможный рост не более ×2.
+•	Подготовлен полный server_seed_full.sql: создаёт схему/вьюхи/RLS и функции upsert_* (страна, блок, тип, локация, норма, дефект).
+•	(Опционально) \copy-скрипт или Node-утилита для пакетного вызова upsert_defect(...) по CSV.
+________________________________________
+14) Деплой/инфраструктура
+•	Локальное развёртывание (Docker/ВМ/ПК/ноутбук).
+•	Node.js: актуальная LTS (рекомендуем 20.x).
+•	Домен/HTTPS/CDN: не требуются на первом этапе.
+•	Azure — как перспектива, конфигурация совместима.
+•	Supabase Storage: настроить CORS и политику Signed URLs.
+________________________________________
+15) Лицензирование и политика данных
+•	Лицензионные планы/партнёрский доступ — не требуются на первом этапе.
+•	Политика данных:
+o	регион хранения — по региону Supabase проекта;
+o	право на удаление/экспорт пользовательских данных;
+o	отчёты/медиа хранятся в Supabase (Retention — по усмотрению пользователя).
+________________________________________
+16) Приёмочные тесты (Acceptance)
+Данные/импорт
+•	Импорт миграций и CSV → записи видны во defects_full_v2/defects_view_v2.
+•	Дедупликация: повторная загрузка не создаёт дублей.
+Фильтры/список
+•	Фильтры по стране/блоку/типу работают; тип зависит от блока;
+•	Сортировка по всем столбцам; пустые значения «не мешают».
+•	Пагинация 50/100/200; «выбрать страницу/всё» корректно управляет выбором.
+Деталь дефекта
+•	Можно присвоить критичность, категорию/локацию, править problem/description/solution.
+•	Измерения: добавить/править/удалить; created_at фиксируется.
+•	«Добавить локацию» — запись появляется в селекте без перезагрузки.
+Экспорт
+•	«Выбранные» → файл содержит только отмеченные строки;
+•	«По фильтрам» → файл содержит все строки, а не только текущую страницу;
+•	DOCX содержит 2–3 фото под дефект при наличии; нормы отображаются (код/пункт/выдержка/ссылка).
+Галерея
+•	Теги добавляются и учитываются в поиске; превью генерируются; пакетное удаление работает.
+PWA/офлайн
+•	Установка на устройство;
+•	Кэш справочников в IndexedDB;
+•	Очередь Background Sync: статусы «в очереди/отправлено», авто-ретраи.
+Безопасность/RLS
+•	anon — только чтение; authenticated — запись согласно политике;
+•	прямой доступ к Storage без Signed URL невозможен.
+Смоук-тесты и E2E
+•	Смоук PWA/офлайн;
+•	E2E (Playwright): сценарии списка, фильтров, экспорта, детальной карточки, измерений, медиа.
+________________________________________
+17) Будущие улучшения (опционально)
+•	Сохранённые пресеты фильтров (персональные).
+•	История правок/комментарии (audit trail).
+•	Импорт CSV из UI для админа.
+•	Группировки/кластеризация в отчётах (по блокам/типам/локациям).
+•	Мультиязычность (EN).
+•	Мульти-тенантность/роли «менеджер/ревьюер» по проектам.
+________________________________________
+18) Приложения
+•	Список нормативов и примеры формулировок — закладываются в norms с code, point, source_url, full_text.
+•	DOCX-шаблон: титул с логотипом, оглавление, колонтитулы, QR-подпись; разделы «Данные об объекте», «Инструменты», «Нормативно-правовая база», «Фотоотчёт» и др.
+•	Медиа-структура: media/{project_id}/{location}/{defect_id}/{photos|videos|docs}/…
+ 
+Ниже привожу полный server_seed_full.sql для Supabase/Postgres — в том виде, чтобы можно было загрузить его в SQL Editor Supabase (под service_role) или выполнить через psql.
+Файл создаёт:
+•	все таблицы (countries, blocks, defect_types, norms, severity_levels, location_categories, locations, defects, defect_measurements, media_files, import_logs),
+•	все вьюхи (defects_full_v2, defects_view_v2),
+•	включает RLS + политики чтения/записи,
+•	вставляет сиды критичности,
+•	добавляет функции upsert_* для словарей, норм и дефектов.
+________________________________________
+-- server_seed_full.sql
+-- Полный сидинг схемы и функций для Supabase/Postgres
+-- ВАЖНО: запускать только под service_role, в браузере не выполнять!
+
+begin;
+
+-- Extensions -----------------------------------------------------------------
+create extension if not exists "uuid-ossp";
+create extension if not exists pgcrypto;
+
+-- Справочники ---------------------------------------------------------------
+create table if not exists countries(
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  is_enabled boolean not null default true
+);
+
+create table if not exists blocks(
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null
+);
+
+create table if not exists defect_types(
+  id uuid primary key default gen_random_uuid(),
+  block_id uuid not null references blocks(id) on delete cascade,
+  name text not null,
+  unique(block_id, name)
+);
+
+create table if not exists norms(
+  id uuid primary key default gen_random_uuid(),
+  country_id uuid not null references countries(id) on delete cascade,
+  code text not null,
+  point text not null,
+  source_url text,
+  full_text text,
+  unique(country_id, code, point)
+);
+
+create table if not exists severity_levels(
+  id bigserial primary key,
+  name text unique not null,
+  sort_order int not null
+);
+
+create table if not exists location_categories(
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null
+);
+
+create table if not exists locations(
+  id uuid primary key default gen_random_uuid(),
+  category_id uuid not null references location_categories(id) on delete cascade,
+  name text not null,
+  unique(category_id, name)
+);
+
+-- Дефекты -------------------------------------------------------------------
+create table if not exists defects(
+  id uuid primary key default gen_random_uuid(),
+  country_id uuid not null references countries(id),
+  block_id uuid not null references blocks(id),
+  type_id uuid not null references defect_types(id),
+  problem text not null,
+  description text,
+  solution text,
+  norm_id uuid references norms(id),
+  severity_id bigint references severity_levels(id),
+  location_id uuid references locations(id),
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists defects_dedupe_idx
+on defects(country_id, block_id, type_id, problem, coalesce(norm_id,'00000000-0000-0000-0000-000000000000'));
+
+-- Измерения -----------------------------------------------------------------
+create table if not exists defect_measurements(
+  id bigserial primary key,
+  defect_id uuid not null references defects(id) on delete cascade,
+  name text not null,
+  value text,
+  unit text,
+  created_at timestamptz not null default now(),
+  created_by uuid
+);
+
+-- Медиа ---------------------------------------------------------------------
+create table if not exists media_files(
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid,
+  defect_id uuid references defects(id) on delete set null,
+  location_id uuid references locations(id) on delete set null,
+  path text not null,
+  preview_path text,
+  exif jsonb,
+  tags text[],
+  created_at timestamptz not null default now()
+);
+
+-- Логи импорта ---------------------------------------------------------------
+create table if not exists import_logs(
+  id bigserial primary key,
+  source text,
+  rows int,
+  started_at timestamptz default now(),
+  finished_at timestamptz,
+  details jsonb
+);
+
+-- Вьюхи ---------------------------------------------------------------------
+create or replace view defects_full_v2 as
+select d.*,
+       c.name as country_name,
+       b.name as block_name,
+       t.name as type_name,
+       l.name as location_name,
+       lc.name as location_category_name,
+       n.code as norm_code,
+       n.point as norm_point,
+       n.source_url as norm_source_url,
+       n.full_text as norm_full_text,
+       s.name as severity_name,
+       s.sort_order as severity_order,
+       (coalesce(n.code,'') || ' ' || coalesce(n.point,'')) as norm_display
+from defects d
+join countries c on c.id = d.country_id
+join blocks b on b.id = d.block_id
+join defect_types t on t.id = d.type_id
+left join locations l on l.id = d.location_id
+left join location_categories lc on lc.id = l.category_id
+left join norms n on n.id = d.norm_id
+left join severity_levels s on s.id = d.severity_id;
+
+create or replace view defects_view_v2 as
+select id, country_id, block_id, type_id, problem, description, solution,
+       norm_id, severity_id, location_id,
+       country_name, block_name, type_name,
+       location_category_name, location_name,
+       norm_display, severity_order
+from defects_full_v2;
+
+-- RLS -----------------------------------------------------------------------
+alter table countries enable row level security;
+alter table blocks enable row level security;
+alter table defect_types enable row level security;
+alter table norms enable row level security;
+alter table severity_levels enable row level security;
+alter table location_categories enable row level security;
+alter table locations enable row level security;
+alter table defects enable row level security;
+alter table defect_measurements enable row level security;
+alter table media_files enable row level security;
+
+-- Политики select для anon/authenticated
+create policy if not exists "read_all_countries" on countries for select using (true);
+create policy if not exists "read_all_blocks" on blocks for select using (true);
+create policy if not exists "read_all_types" on defect_types for select using (true);
+create policy if not exists "read_all_norms" on norms for select using (true);
+create policy if not exists "read_all_severity" on severity_levels for select using (true);
+create policy if not exists "read_all_loc_cat" on location_categories for select using (true);
+create policy if not exists "read_all_locations" on locations for select using (true);
+create policy if not exists "read_all_defects" on defects for select using (true);
+create policy if not exists "read_all_measurements" on defect_measurements for select using (true);
+create policy if not exists "read_all_media" on media_files for select using (true);
+
+-- Политики записи для authenticated
+create policy if not exists "auth_upd_defects" on defects for update to authenticated using (true);
+create policy if not exists "auth_insupd_measurements" on defect_measurements for all to authenticated using (true) with check (true);
+create policy if not exists "auth_ins_locations" on locations for insert to authenticated with check (true);
+create policy if not exists "auth_ins_media" on media_files for insert to authenticated with check (true);
+
+-- Seed критичности -----------------------------------------------------------
+insert into severity_levels(name, sort_order) values
+  ('Критично',1),
+  ('Существенно',2),
+  ('Незначительно',3),
+  ('Информативно',4)
+on conflict (name) do update set sort_order=excluded.sort_order;
+
+-- Функции upsert -------------------------------------------------------------
+create or replace function upsert_country(p_name text, p_enabled boolean default true)
+returns uuid language plpgsql as $$
+declare v_id uuid;
+begin
+  insert into countries(name, is_enabled) values (p_name, coalesce(p_enabled,true))
+  on conflict(name) do update set is_enabled=excluded.is_enabled
+  returning id into v_id;
+  return v_id;
+end $$;
+
+create or replace function upsert_block(p_name text)
+returns uuid language plpgsql as $$
+declare v_id uuid;
+begin
+  insert into blocks(name) values (p_name)
+  on conflict(name) do update set name=excluded.name
+  returning id into v_id;
+  return v_id;
+end $$;
+
+create or replace function upsert_type(p_block text, p_type text)
+returns uuid language plpgsql as $$
+declare v_bid uuid; v_tid uuid;
+begin
+  v_bid := upsert_block(p_block);
+  insert into defect_types(block_id, name) values(v_bid, p_type)
+  on conflict(block_id,name) do update set name=excluded.name
+  returning id into v_tid;
+  return v_tid;
+end $$;
+
+create or replace function upsert_loc_category(p_name text)
+returns uuid language plpgsql as $$
+declare v_id uuid;
+begin
+  insert into location_categories(name) values (p_name)
+  on conflict(name) do update set name=excluded.name
+  returning id into v_id;
+  return v_id;
+end $$;
+
+create or replace function upsert_location(p_cat text, p_loc text)
+returns uuid language plpgsql as $$
+declare v_cid uuid; v_lid uuid;
+begin
+  v_cid := upsert_loc_category(p_cat);
+  insert into locations(category_id, name) values (v_cid, p_loc)
+  on conflict(category_id,name) do update set name=excluded.name
+  returning id into v_lid;
+  return v_lid;
+end $$;
+
+create or replace function upsert_norm(p_country text, p_code text, p_point text, p_url text, p_full text)
+returns uuid language plpgsql as $$
+declare v_cid uuid; v_nid uuid;
+begin
+  v_cid := upsert_country(p_country, true);
+  insert into norms(country_id, code, point, source_url, full_text)
+  values (v_cid, p_code, p_point, p_url, p_full)
+  on conflict(country_id, code, point) do update set
+    source_url = excluded.source_url,
+    full_text = excluded.full_text
+  returning id into v_nid;
+  return v_nid;
+end $$;
+
+create or replace function upsert_defect(
+  p_country text,
+  p_block text,
+  p_type text,
+  p_problem text,
+  p_description text,
+  p_solution text,
+  p_norm_code text,
+  p_norm_point text,
+  p_severity text,
+  p_loc_cat text,
+  p_location text
+) returns uuid language plpgsql as $$
+declare
+  v_cid uuid;
+  v_bid uuid;
+  v_tid uuid;
+  v_sid bigint;
+  v_lid uuid;
+  v_nid uuid;
+  v_id uuid;
+begin
+  v_cid := upsert_country(p_country, true);
+  v_tid := upsert_type(p_block, p_type);
+  select block_id into v_bid from defect_types where id=v_tid;
+  if p_loc_cat is not null and p_location is not null then
+    v_lid := upsert_location(p_loc_cat, p_location);
+  end if;
+  if p_norm_code is not null and p_norm_point is not null then
+    v_nid := upsert_norm(p_country, p_norm_code, p_norm_point, null, null);
+  end if;
+  if p_severity is not null then
+    select id into v_sid from severity_levels where name = p_severity;
+  end if;
+
+  insert into defects(country_id, block_id, type_id, problem, description, solution, norm_id, severity_id, location_id)
+  values (v_cid, v_bid, v_tid, p_problem, p_description, p_solution, v_nid, v_sid, v_lid)
+  on conflict (country_id, block_id, type_id, problem, coalesce(norm_id,'00000000-0000-0000-0000-000000000000'))
+  do update set description = excluded.description, solution = excluded.solution, severity_id = excluded.severity_id, location_id = excluded.location_id
+  returning id into v_id;
+  return v_id;
+end $$;
+
+commit;
+________________________________________
+📌 Рекомендации по использованию:
+1.	Выполните скрипт в Supabase SQL Editor или psql под service_role.
+2.	Для пакетной загрузки CSV используйте \copy + вызовы upsert_defect(...) по строкам.
+3.	После запуска вьюхи defects_full_v2 и defects_view_v2 будут готовы для UI.
+4.	RLS включены — доступ anon/authenticated ограничен согласно политикам.
+
+ 

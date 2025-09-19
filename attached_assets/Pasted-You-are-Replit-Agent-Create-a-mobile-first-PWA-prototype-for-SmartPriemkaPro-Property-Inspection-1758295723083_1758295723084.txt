@@ -1,0 +1,90 @@
+You are Replit Agent. Create a mobile-first PWA prototype for “SmartPriemkaPro” (Property Inspection).
+
+## Tech & setup
+- Next.js 15 (App Router), TypeScript, TailwindCSS, shadcn/ui, eslint+prettier.
+- PWA: add `/public/manifest.json`, icons, and a minimal service worker for offline shell.
+- Supabase SDK wired (env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY).
+- Mobile-first (390x844), responsive to desktop (1440).
+
+## Routes (App Router)
+- /(auth) login → `/auth`
+- `/dashboard`
+- `/objects/[id]` (Object detail with tabs)
+- `/defects/new`
+- `/gallery`
+- `/report`
+- `/settings` (admin)
+
+## Navigation
+- Mobile: bottom tab bar (Dashboard | Objects | Gallery | Reports | Settings).
+- Desktop: left sidebar, same sections.
+- Link map: Auth→Dashboard; Dashboard→/objects/[id]; Object tabs→ Defects|Gallery|Report|Settings; DefectForm Save→/objects/[id]; Gallery/Report/Settings Back→/objects/[id].
+
+## UI components (reusable)
+- `ui/Button`, `ui/Card`, `ui/FormField`, `ui/Tab`, `ui/Badge`, `ui/BottomNav`, `ui/Sidebar`, `ui/GalleryItem`.
+- Use shadcn primitives (`button`, `card`, `input`, `textarea`, `select`, `tabs`, `badge`).
+- Severity colors: low=emerald, medium=amber, high=rose (Tailwind).
+
+## Pages (skeletons + copy)
+1) Auth `/auth`
+   - Email/password form; on success: role redirect
+     - guest→/dashboard (readonly), inspector→/dashboard (+New), admin→/settings.
+
+2) Dashboard `/dashboard`
+   - Header: “My Objects”
+   - Filter by status (All/In progress/Done)
+   - Cards list: title, address, status badge
+   - FAB “+ New Object” (only inspector/admin) → (stub) modal create.
+
+3) Object detail `/objects/[id]`
+   - Header: name/address
+   - Tabs: Rooms | Defects | Gallery | Report
+   - Rooms list: Kitchen/Living/Bedroom/Bathroom/Corridor (+ Add Room)
+   - Room card shows: defects count, max severity badge.
+
+4) DefectForm `/defects/new`
+   - Fields: location(select), defectType(select), photo(upload), normative(autocomplete), severity(radio), comment(textarea)
+   - Buttons: Save (insert stub), Cancel (back).
+
+5) Gallery `/gallery`
+   - Responsive grid (2 cols mobile / 4 desktop); filters by room/type/severity; multiselect delete (guarded).
+
+6) ReportExport `/report`
+   - Toggles: include photos; Export buttons: DOCX/PDF/XLSX (stubs).
+
+7) Settings `/settings` (admin)
+   - Dictionaries: locations, norms, severity_levels, defect_types; Users/roles list.
+
+## Data layer (stubs wired for Supabase later)
+- Create `/lib/supabaseClient.ts` with env guards.
+- Hooks: `/hooks/useObjects.ts`, `/hooks/useDefects.ts`, `/hooks/useUploadPhoto.ts` (currently return mocked data; easy swap to Supabase).
+- Mock seed (in-memory): objects, locations, severity_levels, defect_types, defects (with photo_url as placeholder).
+
+## Tailwind & layout
+- Add Tailwind, container max-w-screen-md mobile, expand to lg/xl on desktop.
+- Global layout places:
+  - mobile: `<BottomNav />` fixed bottom;
+  - desktop (lg+): `<Sidebar />` left, content area with header.
+- Accessibility: labels/aria, focus rings.
+
+## Files to generate (key excerpts)
+- `app/layout.tsx`: font, providers, BottomNav/Sidebar responsive switch.
+- `app/auth/page.tsx`: email/password form + fake signIn stub + role redirect logic.
+- `app/dashboard/page.tsx`: cards list + filter + FAB.
+- `app/objects/[id]/page.tsx`: tabs + lists + badges.
+- `app/defects/new/page.tsx`: form fields and actions.
+- `app/gallery/page.tsx`: grid + filters.
+- `app/report/page.tsx`: export toggles & buttons.
+- `app/settings/page.tsx`: lists & forms for dictionaries/users.
+- `components/ui/*`: Button/Card/Input/Select/Textarea/Tabs/Badge, BottomNav, Sidebar, GalleryItem.
+- `public/manifest.json` (+ icons) and a minimal `service-worker.js`.
+
+## Acceptance criteria
+- Runs with `npm run dev` without type errors.
+- Mobile-first layout works; desktop shows sidebar.
+- All nav links clickable and match the Link map.
+- Severity badges color-coded.
+- Replace one boolean in a `.env.local.example` to prove env reading.
+- Clear TODOs where Supabase calls should replace mocks.
+
+Build now. Output the generated file tree and key code snippets.
