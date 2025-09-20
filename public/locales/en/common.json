@@ -1,0 +1,19 @@
+{
+  "objectTitleAlpha": "Residential Complex Alpha",
+  "objectAddressAlpha": "123 Main St, Moscow",
+  "objectTitleBeta": "Office Building Beta",
+  "objectAddressBeta": "456 Business Ave, Moscow",
+  "objectTitleGamma": "Shopping Center Gamma",
+  "objectAddressGamma": "789 Commerce Blvd, Moscow",
+  "myObjects": "My Objects",
+  "manageInspections": "Manage your property inspections",
+  "allObjects": "All Objects",
+  "inProgress": "In Progress",
+  "complete": "Complete",
+  "newObject": "New Object",
+  "roomsProgress": "Rooms Progress",
+  "openDefects": "Open Defects",
+  "noObjectsFound": "No objects found",
+  "createFirstObject": "Create your first inspection object to get started.",
+  "noObjectsWithStatus": "No objects with the selected status"
+}

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from 'react';
 import { ArrowLeft, Plus, MapPin } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTranslation } from 'next-i18next';
 
 // Mock data for object details
 const mockObject = {
@@ -34,6 +35,7 @@ const mockDefects = [
 
 export default function ObjectDetailPage() {
   const params = useParams();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('rooms');
 
   const getSeverityBadge = (severity: string | null) => {
@@ -50,6 +52,19 @@ export default function ObjectDetailPage() {
         return <Badge variant="outline">Unknown</Badge>;
     }
   };
+
+  const mockObjects = [
+    {
+      id: '1',
+      title: t('objectTitleAlpha'),
+      address: t('objectAddressAlpha'),
+      status: 'in_progress',
+      defectCount: 12,
+      completedRooms: 8,
+      totalRooms: 15,
+    },
+    // ...
+  ];
 
   return (
     <div className="space-y-6">

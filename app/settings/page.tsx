@@ -1,4 +1,4 @@
-"use client"
+    "use client"
 
 import { useState } from 'react';
 import { Plus, Edit, Trash2, Users, Database } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTranslation } from 'next-i18next';
 
 // Mock data for settings
 const mockLocations = [
@@ -38,6 +39,7 @@ const mockSeverityLevels = [
 ];
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('locations');
 
   const getRoleBadge = (role: string) => {

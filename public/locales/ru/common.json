@@ -1,0 +1,19 @@
+﻿{
+  "objectTitleAlpha": "Жилой комплекс Альфа",
+  "objectAddressAlpha": "ул. Главная, 123, Москва",
+  "objectTitleBeta": "Офисное здание Бета",
+  "objectAddressBeta": "Бизнес-авеню, 456, Москва",
+  "objectTitleGamma": "Торговый центр Гамма",
+  "objectAddressGamma": "Бульвар Коммерции, 789, Москва",
+  "myObjects": "Мои объекты",
+  "manageInspections": "Управляйте приёмкой объектов",
+  "allObjects": "Все объекты",
+  "inProgress": "В работе",
+  "complete": "Завершено",
+  "newObject": "Новый объект",
+  "roomsProgress": "Прогресс по комнатам",
+  "openDefects": "Открытые дефекты",
+  "noObjectsFound": "Объекты не найдены",
+  "createFirstObject": "Создайте первый объект для начала работы.",
+  "noObjectsWithStatus": "Нет объектов с выбранным статусом"
+}

@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTranslation } from 'next-i18next';
 
 export default function NewDefectPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [formData, setFormData] = useState({
     location: '',
@@ -45,6 +47,19 @@ export default function NewDefectPage() {
       setFormData(prev => ({ ...prev, photo: file }));
     }
   };
+
+  const mockObjects = [
+    {
+      id: '1',
+      title: t('objectTitleAlpha'),
+      address: t('objectAddressAlpha'),
+      status: 'in_progress',
+      defectCount: 12,
+      completedRooms: 8,
+      totalRooms: 15,
+    },
+    // ...
+  ];
 
   return (
     <div className="space-y-6">

@@ -4,6 +4,7 @@ import './globals.css';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { Sidebar } from '@/components/ui/sidebar';
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration';
+import '../src/i18n';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -17,7 +18,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="ru">
       <body className={inter.className}>
         <ServiceWorkerRegistration />
         <div className="min-h-screen bg-background">
