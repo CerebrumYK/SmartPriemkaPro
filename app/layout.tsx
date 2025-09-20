@@ -1,12 +1,9 @@
 import React from 'react';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { Sidebar } from '@/components/ui/sidebar';
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration';
-import '../src/i18n';
-
-const inter = Inter({ subsets: ['latin'] });
+import { I18nProvider } from '@/components/i18n-provider';
 
 export const metadata = {
   title: 'SmartPriemkaPro',
@@ -19,17 +16,19 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body className={inter.className}>
+      <body className="font-sans">
         <ServiceWorkerRegistration />
-        <div className="min-h-screen bg-background">
-          <Sidebar />
-          <main className="lg:ml-64 pb-16 lg:pb-0">
-            <div className="container mx-auto px-4 py-6 max-w-screen-md lg:max-w-none">
-              {children}
-            </div>
-          </main>
-          <BottomNav />
-        </div>
+        <I18nProvider>
+          <div className="min-h-screen bg-background">
+            <Sidebar />
+            <main className="lg:ml-64 pb-16 lg:pb-0">
+              <div className="container mx-auto px-4 py-6 max-w-screen-md lg:max-w-none">
+                {children}
+              </div>
+            </main>
+            <BottomNav />
+          </div>
+        </I18nProvider>
       </body>
     </html>
   );
