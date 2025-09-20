@@ -12,17 +12,19 @@ import { useTranslation } from 'react-i18next';
 
 // Mock data for settings
 const mockLocations = [
-  { id: '1', name: 'Kitchen', category: 'Living Space' },
-  { id: '2', name: 'Living Room', category: 'Living Space' },
-  { id: '3', name: 'Bedroom', category: 'Living Space' },
-  { id: '4', name: 'Bathroom', category: 'Utilities' },
-  { id: '5', name: 'Corridor', category: 'Common Areas' },
+  { id: '1', nameKey: 'kitchen', categoryKey: 'livingSpace' },
+  { id: '2', nameKey: 'livingRoom', categoryKey: 'livingSpace' },
+  { id: '3', nameKey: 'bedroom', categoryKey: 'livingSpace' },
+  { id: '4', nameKey: 'bathroom', categoryKey: 'utilities' },
+  { id: '5', nameKey: 'hallway', categoryKey: 'utilities' },
 ];
 
 const mockDefectTypes = [
-  { id: '1', name: 'Paint Defect', description: 'Issues with paint application or quality' },
-  { id: '2', name: 'Plumbing Issue', description: 'Water-related problems' },
-  { id: '3', name: 'Electrical Issue', description: 'Electrical system problems' },
+  { id: '1', nameKey: 'cracksInWall', descriptionKey: 'structural' },
+  { id: '2', nameKey: 'waterDamage', descriptionKey: 'functional' },
+  { id: '3', nameKey: 'floorDefects', descriptionKey: 'cosmetic' },
+  { id: '4', nameKey: 'doorDamage', descriptionKey: 'functional' },
+];
   { id: '4', name: 'Tile Issue', description: 'Problems with tile installation or quality' },
 ];
 
@@ -33,9 +35,9 @@ const mockUsers = [
 ];
 
 const mockSeverityLevels = [
-  { id: '1', name: 'Low', color: 'emerald', description: 'Minor issues that can be addressed later' },
-  { id: '2', name: 'Medium', color: 'amber', description: 'Issues requiring attention' },
-  { id: '3', name: 'High', color: 'rose', description: 'Critical issues requiring immediate attention' },
+  { id: '1', nameKey: 'low', color: 'emerald', descriptionKey: 'minorIssues' },
+  { id: '2', nameKey: 'medium', color: 'amber', descriptionKey: 'issuesRequiringAttention' },
+  { id: '3', nameKey: 'high', color: 'rose', descriptionKey: 'criticalIssues' },
 ];
 
 export default function SettingsPage() {
@@ -45,13 +47,13 @@ export default function SettingsPage() {
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'admin':
-        return <Badge variant="destructive">Admin</Badge>;
+        return <Badge variant="destructive">{t('admin')}</Badge>;
       case 'inspector':
-        return <Badge variant="default">Inspector</Badge>;
+        return <Badge variant="default">{t('inspector')}</Badge>;
       case 'guest':
-        return <Badge variant="outline">Guest</Badge>;
+        return <Badge variant="outline">{t('guest')}</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="outline">{t('unknown')}</Badge>;
     }
   };
 
@@ -59,17 +61,17 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground">Manage system dictionaries and user access</p>
+        <h1 className="text-2xl font-bold text-foreground">{t('settings')}</h1>
+        <p className="text-muted-foreground">{t('manageSystemDictionaries')}</p>
       </div>
 
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="locations">Locations</TabsTrigger>
-          <TabsTrigger value="defects">Defect Types</TabsTrigger>
-          <TabsTrigger value="severity">Severity</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="locations">{t('locations')}</TabsTrigger>
+          <TabsTrigger value="defects">{t('defectTypes')}</TabsTrigger>
+          <TabsTrigger value="severity">{t('severity')}</TabsTrigger>
+          <TabsTrigger value="users">{t('users')}</TabsTrigger>
         </TabsList>
 
         {/* Locations Tab */}
@@ -80,15 +82,15 @@ export default function SettingsPage() {
                 <div>
                   <CardTitle className="flex items-center">
                     <Database className="mr-2 h-5 w-5" />
-                    Location Dictionary
+                    {t('locationDictionary')}
                   </CardTitle>
                   <CardDescription>
-                    Manage available locations for defect classification
+                    {t('manageAvailableLocations')}
                   </CardDescription>
                 </div>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Location
+                  {t('addLocation')}
                 </Button>
               </div>
             </CardHeader>
@@ -97,8 +99,8 @@ export default function SettingsPage() {
                 {mockLocations.map((location) => (
                   <div key={location.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <h3 className="font-medium">{location.name}</h3>
-                      <p className="text-sm text-muted-foreground">{location.category}</p>
+                      <h3 className="font-medium">{t(location.nameKey)}</h3>
+                      <p className="text-sm text-muted-foreground">{t(location.categoryKey)}</p>
                     </div>
                     <div className="flex space-x-2">
                       <Button variant="ghost" size="sm">

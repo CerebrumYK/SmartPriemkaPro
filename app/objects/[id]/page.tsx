@@ -39,17 +39,17 @@ export default function ObjectDetailPage() {
   const [activeTab, setActiveTab] = useState('rooms');
 
   const getSeverityBadge = (severity: string | null) => {
-    if (!severity) return <Badge variant="outline">No issues</Badge>;
+    if (!severity) return <Badge variant="outline">{t('noIssues')}</Badge>;
     
     switch (severity) {
       case 'low':
-        return <Badge variant="low">Low</Badge>;
+        return <Badge variant="low">{t('low')}</Badge>;
       case 'medium':
-        return <Badge variant="medium">Medium</Badge>;
+        return <Badge variant="medium">{t('medium')}</Badge>;
       case 'high':
-        return <Badge variant="high">High</Badge>;
+        return <Badge variant="high">{t('high')}</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="outline">{t('unknown')}</Badge>;
     }
   };
 
@@ -87,10 +87,10 @@ export default function ObjectDetailPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="rooms">Rooms</TabsTrigger>
-          <TabsTrigger value="defects">Defects</TabsTrigger>
-          <TabsTrigger value="gallery">Gallery</TabsTrigger>
-          <TabsTrigger value="report">Report</TabsTrigger>
+          <TabsTrigger value="rooms">{t('rooms')}</TabsTrigger>
+          <TabsTrigger value="defects">{t('defects')}</TabsTrigger>
+          <TabsTrigger value="gallery">{t('gallery')}</TabsTrigger>
+          <TabsTrigger value="report">{t('report')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="rooms" className="space-y-4">

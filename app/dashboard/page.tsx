@@ -49,11 +49,11 @@ export default function DashboardPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'done':
-        return <Badge variant="low">Complete</Badge>;
+        return <Badge variant="low">{t('complete')}</Badge>;
       case 'in_progress':
-        return <Badge variant="medium">In Progress</Badge>;
+        return <Badge variant="medium">{t('inProgress')}</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="outline">{t('unknown')}</Badge>;
     }
   };
 
@@ -69,7 +69,7 @@ export default function DashboardPage() {
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Filter by status" />
+              <SelectValue placeholder={t('filterByStatus')} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t('allObjects')}</SelectItem>
