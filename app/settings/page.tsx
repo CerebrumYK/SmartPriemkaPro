@@ -25,8 +25,6 @@ const mockDefectTypes = [
   { id: '3', nameKey: 'floorDefects', descriptionKey: 'cosmetic' },
   { id: '4', nameKey: 'doorDamage', descriptionKey: 'functional' },
 ];
-  { id: '4', name: 'Tile Issue', description: 'Problems with tile installation or quality' },
-];
 
 const mockUsers = [
   { id: '1', email: 'admin@example.com', role: 'admin', name: 'John Admin', status: 'active' },
